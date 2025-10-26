@@ -3,8 +3,13 @@ from typing import List
 from datetime import datetime
 from fastapi import FastAPI, Request
 import httpx
+import threading
 from dotenv import load_dotenv
 load_dotenv()
+
+def run_bg(coro):
+    import asyncio, threading
+    threading.Thread(target=lambda: asyncio.run(coro), daemon=True).start()
 
 # ==== ENV ====
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
@@ -120,7 +125,7 @@ if USE_SLACK:
             except Exception as e:
                 logger.error(f"chat_update failed: {e}")
                 say(answer)
-        asyncio.get_event_loop().create_task(worker())
+        run_bg(worker())
 
     # يرد على رسائل الخاص (DM) — لازم تضيفي event: message.im و Scope: im:history
     @bolt_app.event("message")
@@ -145,7 +150,7 @@ if USE_SLACK:
             except Exception as e:
                 logger.error(f"chat_update failed: {e}")
                 say(answer)
-        asyncio.get_event_loop().create_task(worker())
+        run_bg(worker())
 
     @api.post("/slack/events")
     async def slack_events(request: Request):
