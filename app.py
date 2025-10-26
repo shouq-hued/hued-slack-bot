@@ -77,7 +77,7 @@ SYSTEM_PROMPT = (
 
 async def call_llm(prompt:str) -> str:
     if not HF_API_KEY:
-        return "⚠️ HF_API_KEY غير مهيأ محليًا. هذا رد تجريبي."
+        return "⚠️ HF_API_KEY غير مهيأ. هذا رد تجريبي."
     headers = {"Authorization": f"Bearer {HF_API_KEY}", "Content-Type": "application/json"}
     url = f"https://api-inference.huggingface.co/models/{HF_LLM_MODEL}"
     payload = {"inputs": f"{SYSTEM_PROMPT}\n\n{prompt}", "parameters": {"max_new_tokens": 300, "temperature": 0.2, "return_full_text": False}}
@@ -98,6 +98,7 @@ if USE_SLACK:
     bolt_app = SlackApp(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
     handler = SlackRequestHandler(bolt_app)
 
+    # يرد على المنشن داخل القنوات
     @bolt_app.event("app_mention")
     def on_mention(body, say, client, logger):
         channel = body["event"].get("channel")
@@ -121,9 +122,35 @@ if USE_SLACK:
                 say(answer)
         asyncio.get_event_loop().create_task(worker())
 
+    # يرد على رسائل الخاص (DM) — لازم تضيفي event: message.im و Scope: im:history
+    @bolt_app.event("message")
+    def on_dm(body, say, client, logger, event):
+        if event.get("channel_type") != "im":
+            return
+        user = event.get("user")
+        channel = event.get("channel")
+        text = event.get("text","").strip()
+        if not text:
+            return
+        placeholder = say("_جارٍ المعالجة..._")
+        ts = placeholder["ts"]
+
+        async def worker():
+            ctx = await retrieve_context(text, k=4)
+            prompt = f"السياق السابق:\n{ctx}\n\nالسؤال الحالي:\n{text}" if ctx else text
+            answer = await call_llm(prompt)
+            await add_to_memory(user, text, answer)
+            try:
+                client.chat_update(channel=channel, ts=ts, text=answer)
+            except Exception as e:
+                logger.error(f"chat_update failed: {e}")
+                say(answer)
+        asyncio.get_event_loop().create_task(worker())
+
     @api.post("/slack/events")
     async def slack_events(request: Request):
         return await handler.handle(request)
 
 @api.get("/health")
-async def health(): return {"ok": True}
+async def health():
+    return {"ok": True}
