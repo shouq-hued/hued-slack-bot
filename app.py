@@ -21,7 +21,7 @@ USE_SLACK = True
 if SLACK_BOT_TOKEN in ("", "test") or SLACK_SIGNING_SECRET in ("", "test") or os.environ.get("USE_SLACK","1") == "0":
     USE_SLACK = False
 
-HF_LLM_MODEL = "meta-llama/Meta-Llama-3-8B-Instruct"
+HF_LLM_MODEL = "meta-llama/Meta-Llama-3-8b-instruct"
 HF_EMB_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MEMORY_FILE = "memory.jsonl"
 EMB_FILE = "embeddings.jsonl"
