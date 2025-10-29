@@ -21,7 +21,7 @@ USE_SLACK = True
 if SLACK_BOT_TOKEN in ("", "test") or SLACK_SIGNING_SECRET in ("", "test") or os.environ.get("USE_SLACK","1") == "0":
     USE_SLACK = False
 
-HF_LLM_MODEL = "HuggingFaceH4/zephyr-7b-beta"
+HF_LLM_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 HF_EMB_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 MEMORY_FILE = "memory.jsonl"
 EMB_FILE = "embeddings.jsonl"
@@ -159,3 +159,18 @@ if USE_SLACK:
 @api.get("/health")
 async def health():
     return {"ok": True}
+
+@api.get("/hf_test")
+async def hf_test():
+    import os
+    import httpx
+    key = os.environ.get("HF_API_KEY", "")
+    model = os.environ.get("HF_LLM_MODEL", "") or "mistralai/Mistral-7B-Instruct-v0.2"
+    url = f"https://api-inference.huggingface.co/models/{model}"
+    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.get(url, headers=headers)
+        return {"status": r.status_code, "ok": r.is_success, "model": model, "preview": r.text[:200]}
+    except Exception as e:
+        return {"status": "client_error", "error": str(e), "model": model}
